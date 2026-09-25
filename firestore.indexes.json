@@ -1,0 +1,115 @@
+{
+  "indexes": [
+    {
+      "_comment": "Chat list: my connections, newest activity first. Mirrors the Supabase index on connections(user_a, user_b) plus the realtime channel.",
+      "collectionGroup": "connections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Deduplicating a match by the other member, without a second read.",
+      "collectionGroup": "connections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Incoming friend requests on the Chats tab.",
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "receiverId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Requests to clean up on account deletion, matched by either side.",
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "members", "arrayConfig": "CONTAINS" }]
+    },
+    {
+      "_comment": "Discovery age filtering. The gender/looking-for filters are applied client-side because Firestore cannot express array intersection.",
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "onboarded", "order": "ASCENDING" },
+        { "fieldPath": "age", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "Name search in the Connect tab, via a lowercased prefix range scan.",
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "fullNameLower", "order": "ASCENDING" }]
+    },
+    {
+      "_comment": "The \"Likes you\" list, newest first.",
+      "collectionGroup": "likes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "likeeId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Which swipes I have already made, to exclude them from the deck.",
+      "collectionGroup": "likes",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "likerId", "order": "ASCENDING" }]
+    },
+    {
+      "_comment": "Passes I have made, to exclude them from the deck.",
+      "collectionGroup": "passes",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "passerId", "order": "ASCENDING" }]
+    },
+    {
+      "_comment": "Plans screen: my meetings in date order (upcoming list uses the range variant).",
+      "collectionGroup": "meetings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "scheduledAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "The feed, newest first.",
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "createdAt", "order": "DESCENDING" }]
+    },
+    {
+      "_comment": "A profile's own posts.",
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "authorId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Active coach cards in a thread. The subcollection inherits the parent's security rules.",
+      "collectionGroup": "suggestions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "Message history in a thread, oldest-first after reversal.",
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "createdAt", "order": "DESCENDING" }]
+    }
+  ],
+  "fieldOverrides": []
+}

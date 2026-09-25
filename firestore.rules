@@ -1,0 +1,355 @@
+rules_version = '2';
+
+// ============================================================================
+// Closey — Firestore security rules
+//
+// Direct port of the Postgres RLS policies in
+// `supabase/migrations/0002_rls.sql`, `0003_messaging_ai.sql`,
+// `0007_safety_preferences.sql` and `0011_integrity_and_entitlements.sql`.
+//
+// The single most important rule here is `suggestions/`:
+//
+//   A suggestion with visibility == 'private' may only ever be READ by its
+//   `targetUserId`. Firestore evaluates rules per listener, server-side, so the
+//   partner's device never receives the document at all.
+//
+// The Supabase version achieved this with
+//   using (visibility = 'private' and target_user_id = auth.uid())
+// but the client still received the row over the shared match channel and
+// filtered it in the UI. The promise "your match will never know you were
+// nudged" is now enforced by the database, not by client code.
+//
+// The second important rule is `users/{uid}/private/**`: the client may READ
+// its own quota and subscription so it can display them, but may NEVER write
+// them. Only the Admin SDK (Cloud Functions) can. That is the Firestore
+// equivalent of the Postgres `try_consume_suggestion` security-definer
+// function, and it is what makes the shared AI pool tamper-proof.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------- helpers --
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    /// True when the caller is one of the two people in this connection.
+    /// `members` is a sorted 2-element array, so this is one index check and
+    /// cannot be bypassed by a crafted query.
+    function isMember(members) {
+      return signedIn() && members is list && uid() in members;
+    }
+
+    /// True when the caller is in this connection, read from the stored doc.
+    function isConnectionMember(connectionId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/connections/$(connectionId))
+        && uid() in get(/databases/$(database)/documents/connections/$(connectionId)).data.members;
+    }
+
+    /// Only these keys are ever changed by the client on a user document.
+    function validProfileUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'fullName', 'fullNameLower', 'handle', 'birthDate', 'age', 'gender',
+          'city', 'country', 'bio', 'photos', 'avatarUrl', 'interests',
+          'conversationTopics', 'promptQuestion', 'promptAnswer', 'lookingFor',
+          'minAge', 'maxAge', 'maxDistanceKm', 'onboarded', 'online',
+          'lastSeenAt', 'location', 'notifyMatches', 'notifyMessages',
+          'notifySuggestions', 'showDistance', 'showOnline', 'updatedAt',
+        ]);
+    }
+
+    // ================================================================ users ==
+    //
+    // Profiles are readable by any signed-in user — discovery depends on it.
+    // Private subcollections are not (see below).
+
+    match /users/{userId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn() && uid() == userId;
+
+      allow update: if signedIn()
+        && uid() == userId
+        && validProfileUpdate();
+
+      // Deletion is allowed for the owner (account deletion flow), and the
+      // `onUserDeleted` Cloud Function sweeps the rest.
+      allow delete: if signedIn() && uid() == userId;
+
+      // ------------------------------------------------------ private data --
+      //
+      // Quota, subscription, purchase history and push tokens. Read-only to the
+      // owner; writes come exclusively from Cloud Functions using the Admin SDK
+      // (which bypasses rules). This is the tamper-proof boundary.
+      match /private/{docId} {
+        allow read: if signedIn() && uid() == userId;
+        allow write: if false;
+      }
+
+      // -------------------------------------------------------- block list --
+      match /blocks/{blockedId} {
+        allow read: if signedIn() && uid() == userId;
+        // Block/unblock runs through the `blockUser` callable so that both
+        // sides of the relationship stay consistent.
+        allow write: if false;
+      }
+    }
+
+    // ========================================================== connections ==
+    //
+    // A connection is the 1:1 thread. Doc id is the sorted pair of uids joined
+    // with `__`, so a double-tap or two devices cannot create two threads.
+
+    match /connections/{connectionId} {
+      // Applies to both `get` and `list`. Because Firestore must be able to
+      // PROVE every document in a query satisfies this, an unfiltered query is
+      // rejected automatically — the client is forced to include
+      // `where('members', arrayContains: uid)`. That is why there is no
+      // separate, permissive `list` rule here.
+      allow read: if signedIn()
+        && resource != null
+        && uid() in resource.data.members;
+
+      // Created by the client inside a transaction when a mutual like happens,
+      // or by the `startDm` / `acceptFriendRequest` functions.
+      allow create: if signedIn()
+        && uid() in request.resource.data.members
+        && request.resource.data.members.size() == 2;
+
+      // Members may update the preview and their own unread counter. `members`
+      // and `kind` are immutable — otherwise someone could invite themselves
+      // into a thread or upgrade a metered DM to an unlimited friend thread.
+      allow update: if signedIn()
+        && uid() in resource.data.members
+        && request.resource.data.members == resource.data.members
+        && request.resource.data.kind == resource.data.kind;
+
+      // Unmatching deletes the message and suggestion subcollections too, which
+      // only a Cloud Function can do.
+      allow delete: if false;
+
+      // ---------------------------------------------------------- messages --
+      match /messages/{messageId} {
+        allow read: if isConnectionMember(connectionId);
+
+        allow create: if isConnectionMember(connectionId)
+          && request.resource.data.senderId == uid()
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 4000;
+
+        // Only read receipts are mutable. A sent message is immutable, so
+        // neither person can rewrite history.
+        allow update: if isConnectionMember(connectionId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+
+        allow delete: if isConnectionMember(connectionId)
+          && resource.data.senderId == uid();
+      }
+
+      // ------------------------------------------------------- suggestions --
+      //
+      // THE CENTRAL PRIVACY RULE OF THE PRODUCT.
+      match /suggestions/{suggestionId} {
+        // Shared: either person in the thread may read it.
+        // Private: ONLY the person being nudged may read it. Their match is
+        // filtered out server-side and never receives the document.
+        allow read: if isConnectionMember(connectionId)
+          && (
+            resource.data.visibility == 'shared'
+            || resource.data.targetUserId == uid()
+          );
+
+        // Clients cannot forge a suggestion. Only Cloud Functions write these,
+        // so nobody can inject text into their partner's chat pretending it
+        // came from the coach.
+        allow create: if false;
+
+        // Either person may mark a shared suggestion used or dismissed (both
+        // see it live). A private suggestion may only be actioned by its target.
+        allow update: if isConnectionMember(connectionId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reactedAt'])
+          && (
+            (resource.data.visibility == 'shared')
+            || (resource.data.visibility == 'private' && resource.data.targetUserId == uid())
+          );
+
+        allow delete: if false;
+      }
+
+      // ------------------------------------------------------------ opt-in --
+      //
+      // Mutual consent for the coach. You may read your partner's opt-in (the UI
+      // shows "waiting for them") but you may only write your own — so nobody
+      // can switch the coach on for someone else.
+      match /optIns/{userId} {
+        allow read: if isConnectionMember(connectionId);
+        allow write: if isConnectionMember(connectionId) && uid() == userId;
+      }
+    }
+
+    // ================================================================ likes ==
+    //
+    // `likes/{likerId}__{likeeId}`. Readable by both parties because the
+    // client needs to know whether a right-swipe will instantly match.
+
+    match /likes/{likeId} {
+      allow read: if signedIn()
+        && (
+          resource.data.likerId == uid()
+          || resource.data.likeeId == uid()
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.likerId == uid()
+        && request.resource.data.likeeId != uid();
+
+      // Undo.
+      allow delete: if signedIn() && resource.data.likerId == uid();
+
+      allow update: if false;
+    }
+
+    match /passes/{passId} {
+      allow read: if signedIn() && resource.data.passerId == uid();
+      allow create: if signedIn() && request.resource.data.passerId == uid();
+      allow delete: if signedIn() && resource.data.passerId == uid();
+      allow update: if false;
+    }
+
+    // ====================================================== friend requests ==
+    //
+    // Acceptance creates a connection and bumps both profiles' friend counters,
+    // so it runs through the `acceptFriendRequest` callable. Declining is a
+    // plain status flip the recipient may do directly.
+
+    match /friendRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          resource.data.senderId == uid()
+          || resource.data.receiverId == uid()
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.senderId == uid()
+        && request.resource.data.receiverId != uid();
+
+      allow update: if signedIn()
+        && resource.data.receiverId == uid()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
+        && request.resource.data.status in ['declined', 'accepted'];
+
+      allow delete: if signedIn() && resource.data.senderId == uid();
+    }
+
+    // ============================================================= meetings ==
+    //
+    // Top-level so the Plans screen can query across every connection by date.
+
+    match /meetings/{meetingId} {
+      allow read: if signedIn() && uid() in resource.data.members;
+
+      allow create: if signedIn()
+        && uid() in request.resource.data.members
+        && request.resource.data.proposedBy == uid()
+        && request.resource.data.scheduledAt is timestamp;
+
+      // Either person may accept, decline or cancel.
+      allow update: if signedIn()
+        && uid() in resource.data.members
+        && request.resource.data.members == resource.data.members
+        && request.resource.data.status in ['accepted', 'declined', 'completed', 'cancelled'];
+
+      allow delete: if signedIn() && resource.data.proposedBy == uid();
+    }
+
+    // ================================================================ posts ==
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorId == uid()
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 2000;
+
+      // The author may edit the body and audience, never the counters.
+      // `likeCount` is maintained by the `onPostLike` Cloud Function trigger, so
+      // a client cannot inflate its own popularity.
+      allow update: if signedIn()
+        && resource.data.authorId == uid()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['body', 'audience', 'tags', 'editedAt']);
+
+      allow delete: if signedIn() && resource.data.authorId == uid();
+
+      // One marker document per liker. Its existence IS the like, and a trigger
+      // keeps the counter honest.
+      match /likes/{likerId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && uid() == likerId;
+        allow delete: if signedIn() && uid() == likerId;
+        allow update: if false;
+      }
+    }
+
+    // ============================================================== reports ==
+    //
+    // Deliberately asymmetric: anyone may file a report, nobody may read one
+    // back. Otherwise a reported user could enumerate reports against them.
+
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == uid()
+        && request.resource.data.reportedId != uid();
+
+      allow read, update, delete: if false;
+    }
+
+    // =============================================================== blocks ==
+    //
+    // Legacy top-level path retained for compatibility with the mirror written
+    // by the `blockUser` function. The authoritative list is
+    // `users/{uid}/blocks/{blockedId}` plus the `blockedUserIds` array.
+
+    match /blocks/{blockId} {
+      allow read: if signedIn() && resource.data.blockerId == uid();
+      allow write: if false;
+    }
+
+    // ============================================================ interests ==
+    //
+    // Canonical tag list for the picker. Public read, function-only write.
+
+    match /interests/{interestId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ================================================================= misc ==
+
+    // Remote config (pricing labels, feature flags).
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Internal analytics for tuning trigger sensitivity. Never client-readable.
+    match /analytics/{docId} {
+      allow read, write: if false;
+    }
+
+    // Default deny. Anything not matched above is unreachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

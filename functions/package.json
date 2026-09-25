@@ -1,0 +1,25 @@
+{
+  "name": "closey-functions",
+  "description": "Closey Cloud Functions — quota enforcement, the AI conversation coach, payments and notifications.",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth,storage",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.1.0",
+    "stripe": "^17.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

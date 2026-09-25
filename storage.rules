@@ -1,0 +1,72 @@
+rules_version = '2';
+
+// ============================================================================
+// Closey — Cloud Storage rules
+//
+// Replaces the Supabase Storage `avatars` bucket plus the storage policies in
+// `supabase/migrations/0001_init.sql`.
+//
+// Two things matter here:
+//
+//  1. **Reads are public, writes are not.** Profile photos have to be
+//     renderable by anyone who can see the profile, so we cannot gate reads on
+//     auth without breaking the deck, the chat list and the feed. Writes,
+//     however, are strictly owner-only and size/type limited.
+//
+//  2. **The path encodes ownership.** `users/{uid}/...` means the rule is a
+//     string comparison rather than a database lookup — no read cost, and no way
+//     for someone to write into another person's folder.
+//
+// Verification selfies go to `users/{uid}/verification/**`, which is NOT
+// publicly readable: only the owner and the KYC pipeline (via the Admin SDK,
+// which bypasses these rules) may touch them. The spec is explicit that raw
+// identity documents must never be stored or exposed by us.
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Profile and post photos. Public read, owner write, images only, 8 MB cap.
+    match /users/{userId}/photos/{fileName} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Verification selfies. Owner-only on every operation, and never listed.
+    match /users/{userId}/verification/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 12 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Never client-deletable: the retention policy is handled server-side so
+      // an identity check cannot be erased mid-review.
+      allow delete: if false;
+    }
+
+    // Post attachments.
+    match /posts/{userId}/{fileName} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Default deny.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
