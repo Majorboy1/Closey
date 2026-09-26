@@ -14,17 +14,36 @@ Supabase.
 The app runs with **no Firebase project at all**:
 
 ```bash
-firebase emulators:start --project demo-closey   # Auth, Firestore, Functions, Storage
-cd flutter_app
-flutter run --dart-define=CLOSEY_EMULATOR=true
+# firebase-tools is pinned to 13.x in ../.devtools — the Firestore emulator
+# bundled with 14+ requires JDK 21, and 13.x works on 17.
+# `--project demo-closey` is explicit: .firebaserc defaults to the real
+# closey-ai-coach project, so that a bare `firebase deploy` targets something
+# that can accept a deploy.
+& "..\.devtools\node_modules\.bin\firebase.cmd" `
+  emulators:start --project demo-closey --only "auth,firestore,storage,functions"
+
+flutter run -d chrome --dart-define=CLOSEY_EMULATOR=true
 ```
 
-To use a real project:
+Quote the `--only` list: in PowerShell a bare `--only auth,firestore` is parsed as
+an *array*, reaches the CLI mangled, and fails with the misleading *"No emulators
+to start"*.
+
+The AI coach needs a DeepSeek key — without one `requestSuggestion` fails and the
+chat screen sits on *"Reading the conversation…"*, because the emulator cannot
+reach Secret Manager to substitute a value:
+
+```bash
+copy functions\.secret.local.example functions\.secret.local   # then fill it in
+```
+
+To use a real project (`closey-ai-coach` is the one this checkout is configured
+for):
 
 ```bash
 flutterfire configure --project=<your-project-id>
 firebase deploy --only firestore:rules,storage,functions
-flutter run
+flutter run -d chrome
 ```
 
 If Firebase cannot be reached, the app does not crash — it routes to
@@ -310,8 +329,8 @@ on project `demo-closey`.
 # Firestore emulator bundled with 14+ requires JDK 21, and 13.x works on 17.
 npm install --prefix ../.devtools firebase-tools@13 --no-audit --no-fund
 
-cd flutter_app
-& "..\.devtools\node_modules\.bin\firebase.cmd" emulators:start --only "auth,firestore,storage"
+& "..\.devtools\node_modules\\.bin\firebase.cmd" `
+  emulators:start --project demo-closey --only "auth,firestore,storage,functions"
 ```
 
 Two gotchas worth knowing:
@@ -327,15 +346,33 @@ Emulator ports: Auth `9099`, Firestore `8080`, Storage `9199`, UI `4000`.
 ### 2. Run the app
 
 ```bash
-flutter run -d chrome          # or: -d windows (see the platform note below)
+flutter run -d chrome
 ```
 
-### 3. Sign in with Gmail
+Windows and Linux desktop are not available — see *Platform support* below.
 
-Tap **Google**. On web this goes through Firebase Auth's own popup, which the
-Auth emulator intercepts with a fake account chooser — so Gmail login works with
-no Google Cloud project and no OAuth client ID. (Mobile uses `google_sign_in`
-instead and needs a real project with the app's SHA-1 registered.)
+### 3. Create the demo account and sign in
+
+**Google sign-in does not work against the Auth emulator.** There is no real
+OAuth server, and `signInWithPopup` fails with *"Unable to establish a connection
+with the popup"*: the popup is served from `authDomain`, which for a demo project
+does not resolve.
+
+Create the account the seed expects. This prints a uid, which step 4 needs — this
+Auth emulator answers `405` to `accounts:batchGet`, so the seed cannot discover a
+signed-in user on its own:
+
+```bash
+$u = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key'
+$b = '{"email":"demo@closey.app","password":"closeydemo","displayName":"You","returnSecureToken":true}'
+(Invoke-RestMethod $u -Method Post -ContentType 'application/json' -Body $b).localId
+```
+
+Then, in the app: **Continue with email → Sign in**, with `demo@closey.app` /
+`closeydemo`.
+
+Real Gmail login needs a real Firebase project with the Google provider enabled;
+mobile additionally needs the app's SHA-1 registered.
 
 ### 4. Seed the account
 
@@ -344,9 +381,13 @@ suggestion — deliberately — so the demo data is written with emulator owner
 privileges:
 
 ```bash
-node tool/seed_emulator.js            # seeds whoever is signed in
-node tool/seed_emulator.js --fresh    # clears prior demo data first
+# --uid is required: this Auth emulator answers 405 to accounts:batchGet, so the
+# script cannot discover the signed-in user. Use the uid printed in step 3, or
+# read it from the browser via indexedDB.open('firebaseLocalStorageDb').
+node tool/seed_emulator.js --fresh --uid=<uid>
 ```
+
+`--probe` checks connectivity to the emulator REST API without writing anything.
 
 This creates five people, three conversations with real message history, a shared
 opener, a **private reciprocity nudge addressed to you**, two meetups and four

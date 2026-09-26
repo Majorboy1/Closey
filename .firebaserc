@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-closey"
+    "default": "closey-ai-coach",
+    "demo": "demo-closey"
   }
 }
