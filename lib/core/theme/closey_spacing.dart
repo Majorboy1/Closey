@@ -36,15 +36,20 @@ abstract final class Gap {
   static const SizedBox gap24 = SizedBox(height: xxl);
 }
 
-/// Corner radii. Cards are 20, sheets are 28, pills are fully round — a
-/// three-shape system instead of the old ad-hoc 10/16/24/32 mix.
+/// Corner radii.
+///
+/// Deliberately tighter than dating-app convention. The category standard is
+/// 20–32dp "bubbly" corners with soft shadows, which reads playful and a little
+/// toy-like — and it is everywhere, so it signals nothing. Closey's identity is
+/// paper: printed pages have crisp corners and hairline rules, not pillows.
+/// Cards 16, sheets 28, pills fully round.
 abstract final class Radii {
-  static const double xs = 8;
-  static const double sm = 12;
-  static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 28;
-  static const double sheet = 32;
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 24;
+  static const double sheet = 28;
   static const double full = 999;
 
   static const BorderRadius allSm = BorderRadius.all(Radius.circular(sm));

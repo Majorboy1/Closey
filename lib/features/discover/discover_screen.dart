@@ -62,7 +62,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       appBar: CloseyAppBar(
         largeTitle: 'Discover',
         subtitle: deckAsync.value == null
-            ? 'Finding people near youâ€¦'
+            ? 'Finding people near you…'
             : '${deckAsync.value!.remainingCount} people to meet',
         showBack: false,
         actions: [
@@ -552,7 +552,7 @@ class _ProfileCard extends StatelessWidget {
                           user.city ?? 'Nearby',
                           if (user.showDistance)
                             formatDistance(candidate.distanceKm),
-                        ].where((s) => s.isNotEmpty).join(' Â· '),
+                        ].where((s) => s.isNotEmpty).join(' · '),
                         style: context.text.bodySmall?.copyWith(
                           color: colors.textTertiary,
                         ),

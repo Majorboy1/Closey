@@ -8,6 +8,7 @@ import '../../core/theme/closey_spacing.dart';
 import '../../core/widgets/async_section.dart';
 import '../../core/widgets/closey_avatar.dart';
 import '../../core/widgets/closey_button.dart';
+import '../../core/widgets/closey_margin_note.dart';
 import '../../core/widgets/closey_scaffold.dart';
 import '../../core/widgets/closey_sheet.dart';
 import '../../core/widgets/closey_surface.dart';
@@ -19,23 +20,22 @@ import '../../data/models/quota.dart';
 import '../../data/repositories/chat_repository.dart';
 import '../../state/app_providers.dart';
 import '../../state/services.dart';
-import 'widgets/coach_card.dart';
 
 /// Chat with the shared AI coach.
 ///
 /// The single most important screen in the product, and the one with the most
 /// deliberate design decisions:
 ///
-/// 1. **The coach is a third participant, not a banner.** Shared suggestions
-///    render as a centred card with *both* avatars, distinct from either
-///    person's bubbles, so a suggestion is never mistaken for a message
-///    somebody sent. `SuggestionCard.tsx` used a left-aligned card that read
-///    like a system notification.
-/// 2. **Private nudges look unmistakably different** â€” recessed rose surface,
-///    a lock icon, "only you can see this", and no quota counter. That last
-///    part matters: the old card showed the shared quota on private cards too.
+/// 1. **The coach is a hand in the margin, not a third participant.** Notes
+///    render indented and unfilled, in italic serif, with a rule to their left
+///    — see [CloseyMarginNote]. The previous design gave the coach the same
+///    surface, radius and type as a message, so it read as somebody having
+///    joined the thread.
+/// 2. **Private nudges are marked rather than coloured.** A dashed rule, a
+///    label reading "only you see this", and no quota counter. The dash is the
+///    entire difference, deliberately: the privacy promise is the product.
 /// 3. **"Use this" fills the composer instead of sending.** The spec's open
-///    question Â§12 was whether to auto-send; auto-sending violates the stated
+///    question §12 was whether to auto-send; auto-sending violates the stated
 ///    guardrail that the AI never speaks as you. The user edits, then sends.
 /// 4. **The coach explains itself.** Every card carries the reason it fired
 ///    ("one person answered without asking back"), because an unexplained
@@ -585,7 +585,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     Text(
                       isFriend
-                          ? 'Friend Â· unlimited chat'
+                          ? 'Friend · unlimited chat'
                           : online
                           ? 'Online now'
                           : '@$handle',
@@ -719,7 +719,7 @@ class _CoachZone extends StatelessWidget {
             : 'Turn on the conversation coach?',
         body: consent.myOptIn
             ? 'You are in. They will see the same shared suggestions once they '
-                  'opt in too â€” nothing is generated until you both agree.'
+                  'opt in too — nothing is generated until you both agree.'
             : 'You will both see the same starter suggestions. If the thread '
                   'goes one-sided, only you see your nudge, and they are never '
                   'told. You can turn this off any time.',
@@ -732,24 +732,14 @@ class _CoachZone extends StatelessWidget {
 
     return Column(
       children: [
-        if (cards.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.sm, Gap.lg, 0),
-            child: Column(
-              children: [
-                for (final card in cards)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Gap.md),
-                    child: CoachCard(
-                      suggestion: card,
-                      remaining: card.isPrivate ? null : quota.remaining,
-                      onUse: () => onUse(card),
-                      onDismiss: () => onDismiss(card),
-                      onBuyMore: onBuyMore,
-                    ),
-                  ),
-              ],
-            ),
+        // Notes sit in the margin of the thread rather than above the composer.
+        // No horizontal padding here: the note owns its own indent, so that it
+        // lines up with neither the message column nor the page edge.
+        for (final card in cards)
+          CloseyMarginNote(
+            suggestion: card,
+            onUse: onUse,
+            onDismiss: () => onDismiss(card),
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xs, Gap.lg, Gap.sm),
@@ -758,7 +748,7 @@ class _CoachZone extends StatelessWidget {
               Expanded(
                 child: CloseyButton(
                   label: loading
-                      ? 'Reading the conversationâ€¦'
+                      ? 'Reading the conversation…'
                       : quiet
                       ? 'Coach is resting for a bit'
                       : 'Help me continue this',
@@ -868,7 +858,7 @@ class _EmptyThread extends StatelessWidget {
             const SizedBox(height: Gap.sm),
             Text(
               isFriend
-                  ? 'Unlimited chat â€” no limits from here.'
+                  ? 'Unlimited chat — no limits from here.'
                   : 'Nothing sent yet. Use a starter above, or type your own.',
               textAlign: TextAlign.center,
               style: context.text.bodyMedium?.copyWith(
@@ -974,7 +964,7 @@ class MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 3),
                 child: Text(
-                  'Sendingâ€¦',
+                  'Sending…',
                   style: TextStyle(
                     fontSize: 10.5,
                     color: colors.chatMineText.withValues(alpha: 0.7),
@@ -1070,7 +1060,7 @@ class _ComposerState extends State<_Composer> {
                           maxLength,
                         }) => null,
                     decoration: InputDecoration(
-                      hintText: 'Messageâ€¦',
+                      hintText: 'Message…',
                       filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

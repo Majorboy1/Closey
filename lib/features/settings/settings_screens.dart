@@ -56,7 +56,7 @@ class SettingsScreen extends ConsumerWidget {
                   CloseyListRow(
                     title: 'Verification',
                     subtitle: me?.verificationTier.canUseCoach ?? false
-                        ? '${me!.verificationTier.label} â€” the coach is unlocked'
+                        ? '${me!.verificationTier.label} — the coach is unlocked'
                         : 'Verify to unlock the conversation coach',
                     icon: Icons.verified_outlined,
                     onTap: () => context.push(Routes.verification),
@@ -103,7 +103,7 @@ class SettingsScreen extends ConsumerWidget {
                     _ToggleRow(
                       title: 'Coach suggestions',
                       subtitle:
-                          'Only shared cards are ever announced â€” never '
+                          'Only shared cards are ever announced — never '
                           'a private nudge',
                       icon: Icons.auto_awesome_outlined,
                       value: me.notifySuggestions,
@@ -240,7 +240,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: Gap.xxl),
             Center(
               child: Text(
-                'Closey Â· v${AppConfig.version} Â· Made for real conversations',
+                'Closey · v${AppConfig.version} · Made for real conversations',
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.textTertiary,
                   fontSize: 11,
@@ -747,7 +747,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             const SizedBox(height: Gap.sm),
             Text(
               'Verified profiles get seen more, and the conversation coach only '
-              'works between two verified people â€” so nobody is being coached '
+              'works between two verified people — so nobody is being coached '
               'without their knowledge.',
               style: context.text.bodyLarge?.copyWith(
                 color: colors.textSecondary,
@@ -775,7 +775,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
               current: current,
               icon: Icons.shield_outlined,
               title: 'Verified',
-              price: 'Free â€” one ID check',
+              price: 'Free — one ID check',
               perks: const [
                 'Everything in Basic',
                 'The conversation coach unlocks',
@@ -828,7 +828,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   const SizedBox(height: Gap.sm),
                   Text(
                     'Verification runs through a specialist identity provider. '
-                    'Closey never stores your passport, licence or ID number â€” '
+                    'Closey never stores your passport, licence or ID number — '
                     'we only receive a pass or fail result.',
                     style: context.text.bodySmall?.copyWith(
                       color: colors.textSecondary,

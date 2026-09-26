@@ -226,7 +226,7 @@ class _RequestRowState extends ConsumerState<_RequestRow> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Wants to connect Â· unlimited free chat',
+                      'Wants to connect · unlimited free chat',
                       style: context.text.bodySmall?.copyWith(
                         color: colors.textSecondary,
                       ),
@@ -318,7 +318,7 @@ class _ConnectionRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    connection.lastMessage ?? 'You matched â€” say hello.',
+                    connection.lastMessage ?? 'You matched — say hello.',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: context.text.bodySmall?.copyWith(

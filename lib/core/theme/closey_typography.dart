@@ -117,6 +117,37 @@ abstract final class CloseyTypography {
     height: 1.4,
     color: c.textPrimary,
   );
+
+  /// The coach's marginal voice.
+  ///
+  /// Smaller and lighter than [coachCopy], and italic, because a margin note is
+  /// annotation rather than content: it has to be legible as a hand in the
+  /// margin and never as another message in the thread. Setting it in the same
+  /// face as the conversation at the same size is what made the old floating
+  /// card read as a third participant.
+  static TextStyle marginNote(CloseyColors c) => TextStyle(
+    fontFamily: 'Fraunces',
+    fontSize: 15,
+    fontWeight: FontWeight.w500,
+    fontStyle: FontStyle.italic,
+    height: 1.48,
+    letterSpacing: -0.05,
+    color: c.accentText,
+  );
+
+  /// A person's own words, quoted back at display size.
+  ///
+  /// A prompt answer is the closest thing Closey has to a voice sample, so it is
+  /// set as a pull quote rather than as another line of body copy — the one
+  /// detail on a profile that tells you what they are actually like to talk to.
+  static TextStyle pullQuote(CloseyColors c) => TextStyle(
+    fontFamily: 'Fraunces',
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    height: 1.28,
+    letterSpacing: -0.4,
+    color: c.textPrimary,
+  );
 }
 
 /// Brand-tinted eyebrow, used by section headers.

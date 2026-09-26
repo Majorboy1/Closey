@@ -235,7 +235,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               highlighted: true,
               perks: const [
                 '20 AI suggestions every day',
-                'A smarter model â€” better, more specific suggestions',
+                'A smarter model — better, more specific suggestions',
                 'Unlimited direct conversations',
                 'Cancel any time',
               ],
@@ -275,7 +275,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   Text(
                     'Everyone gets the same coach for free, and private nudges '
                     'stay private on every plan. Premium buys more suggestions '
-                    'and a better model â€” it never buys a better chance with a '
+                    'and a better model — it never buys a better chance with a '
                     'specific person, and it never lets anyone see your nudges.',
                     style: context.text.bodySmall?.copyWith(
                       color: colors.textSecondary,

@@ -600,7 +600,7 @@ class _MeetingCardState extends ConsumerState<MeetingCard> {
     ];
     final hh = d.hour.toString().padLeft(2, '0');
     final mm = d.minute.toString().padLeft(2, '0');
-    return '${days[d.weekday - 1]} ${d.day} ${months[d.month - 1]} Â· $hh:$mm';
+    return '${days[d.weekday - 1]} ${d.day} ${months[d.month - 1]} · $hh:$mm';
   }
 }
 

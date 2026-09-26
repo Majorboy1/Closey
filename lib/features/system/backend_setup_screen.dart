@@ -59,7 +59,7 @@ class BackendSetupScreen extends StatelessWidget {
             const SizedBox(height: Gap.sm),
             Text(
               'Firebase did not initialise, so nothing can load yet. Pick one '
-              'of the paths below â€” the emulator route needs no cloud account '
+              'of the paths below — the emulator route needs no cloud account '
               'at all.',
               style: context.text.bodyLarge?.copyWith(
                 color: colors.textSecondary,
@@ -175,7 +175,7 @@ class BackendSetupScreen extends StatelessWidget {
 
             const SizedBox(height: Gap.xxl),
             CloseyButton(
-              label: 'I have connected it â€” try again',
+              label: 'I have connected it — try again',
               fullWidth: true,
               icon: Icons.refresh_rounded,
               onPressed: () => SystemNavigator.pop(),

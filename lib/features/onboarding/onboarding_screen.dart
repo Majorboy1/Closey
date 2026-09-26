@@ -85,7 +85,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void initState() {
     super.initState();
     for (final preset in CloseyContent.agePresets) {
-      if (preset.label == '25 â€“ 34') {
+      if (preset.label == '25 – 34') {
         _minAge = preset.min;
         _maxAge = preset.max;
       }
@@ -130,7 +130,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       case 0:
         if (_name.text.trim().length < 2) return 'Add your first name.';
         if (_birthDate == null) {
-          return 'Add your date of birth â€” we need it to confirm you are 18+.';
+          return 'Add your date of birth — we need it to confirm you are 18+.';
         }
         if (!isAtLeast18(_birthDate!)) {
           return 'You must be 18 or over to use Closey.';
@@ -562,7 +562,7 @@ class _BasicsStep extends StatelessWidget {
         ),
         const SizedBox(height: Gap.lg),
 
-        Text('I AM Aâ€¦', style: context.eyebrow()),
+        Text('I AM A…', style: context.eyebrow()),
         const SizedBox(height: Gap.sm),
         Wrap(
           spacing: Gap.sm,
@@ -583,7 +583,7 @@ class _BasicsStep extends StatelessWidget {
         CloseyTextField(
           label: 'City',
           controller: city,
-          hint: 'Lagos, London, Nairobiâ€¦',
+          hint: 'Lagos, London, Nairobi…',
           prefixIcon: Icons.location_on_outlined,
         ),
         const SizedBox(height: Gap.lg),
