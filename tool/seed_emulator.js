@@ -37,7 +37,28 @@ const ts = (d) => ({ timestampValue: new Date(d).toISOString() });
 const geo = (lat, lng) => ({
   geoPointValue: { latitude: lat, longitude: lng },
 });
-const arr = (...values) => ({ arrayValue: { values } });
+/**
+ * Explicit null.
+ *
+ * A bare JS `null` is not a Firestore value and is rejected with the same
+ * unhelpful "Payload isn't valid for request" as a malformed array.
+ */
+const nul = () => ({ nullValue: null });
+/**
+ * Firestore array value.
+ *
+ * Accepts either spread values (`arr(s('a'), s('b'))`) or a single array
+ * (`arr([])`), because both spellings occur below. Calling the spread form with
+ * an array nests a raw JS array inside `values`, which the emulator answers
+ * with "Payload isn't valid for request" — a message that points nowhere near
+ * the actual cause.
+ */
+const arr = (...values) => ({
+  arrayValue: {
+    values:
+      values.length === 1 && Array.isArray(values[0]) ? values[0] : values,
+  },
+});
 const arrStr = (list) => arr(...list.map(s));
 const map = (obj) => ({ mapValue: { fields: obj } });
 
@@ -195,8 +216,68 @@ const POSTS = [
 function parseArgs(argv) {
   return {
     email: argv.find((a) => a.startsWith('--email='))?.slice(8) ?? null,
+    uid: argv.find((a) => a.startsWith('--uid='))?.slice(6) ?? null,
     fresh: argv.includes('--fresh'),
+    probe: argv.includes('--probe'),
   };
+}
+
+/**
+ * Transport check.
+ *
+ * Points at the same endpoints the seeding itself uses, so a failure here is
+ * unambiguously a connectivity/permissions problem rather than a bad document.
+ * Emulator REST behaviour varies between versions, and "400 Payload isn't
+ * valid" is reported for both a malformed body and a route the build does not
+ * implement — this tells the two apart.
+ */
+async function probe() {
+  const show = async (label, res) => {
+    const text = await res.text();
+    console.log(
+      `${label}: ${res.status} ${text.slice(0, 240).replace(/\s+/g, ' ')}`,
+    );
+  };
+
+  await show(
+    'GET  documents root',
+    await fetch(FS, { headers: { Authorization: 'Bearer owner' } }),
+  );
+
+  const body = { fields: { a: { stringValue: 'x' } } };
+
+  // Paths must be `collection/document`. A bare root path is rejected with
+  // 'Document name ... lacks "/"', which looks like a body error but is not.
+  await show(
+    'PATCH minimal body',
+    await fetch(`${FS}/probe_min/one`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer owner',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+
+  await show(
+    'GET  that document back',
+    await fetch(`${FS}/probe_min/one`, {
+      headers: { Authorization: 'Bearer owner' },
+    }),
+  );
+
+  await show(
+    'PATCH empty array',
+    await fetch(`${FS}/probe_min/two`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer owner',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fields: { a: arr([]) } }),
+    }),
+  );
 }
 
 /**
@@ -209,8 +290,17 @@ function parseArgs(argv) {
  *
  * Note the verb: the Identity Toolkit admin API lists users via
  * `accounts:batchGet` (a POST). A plain `GET /accounts` returns 405.
+ *
+ * Some Auth emulator builds do not implement that route at all, and answer 405
+ * regardless of verb. Where that happens, pass `--uid=` instead: the signed-in
+ * uid is visible in the browser by opening DevTools and running
+ * `indexedDB.open('firebaseLocalStorageDb')`, or in the app's splash
+ * diagnostics. Guessing is not an option — the uid is a random string.
  */
-async function findTargetUser({ email }) {
+async function findTargetUser({ email, uid }) {
+  // Explicit uid wins: some emulator builds cannot enumerate accounts at all.
+  if (uid) return { localId: uid, email: null };
+
   const res = await fetch(`${AUTH}/accounts:batchGet?maxResults=1000`, {
     method: 'POST',
     headers: {
@@ -223,7 +313,8 @@ async function findTargetUser({ email }) {
   if (!res.ok) {
     throw new Error(
       `Could not list Auth users (${res.status} ${res.statusText}). ` +
-        'Is the Auth emulator running?',
+        'Is the Auth emulator running? If it is, this build may not support ' +
+        'the admin account list — re-run with --uid=<signed-in uid>.',
     );
   }
 
@@ -256,6 +347,12 @@ async function findTargetUser({ email }) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
+  if (args.probe) {
+    console.log(`Probing ${PROJECT} via ${HOST}…\n`);
+    await probe();
+    return;
+  }
+
   console.log(`Seeding ${PROJECT} via ${HOST}…\n`);
 
   const target = await findTargetUser(args);
@@ -279,9 +376,11 @@ async function main() {
   const now = Date.now();
 
   await setDoc(`users/${uid}`, {
-    fullName: target.displayName ?? 'You',
-    handle: 'you',
-    fullNameLower: String(target.displayName ?? 'you').toLowerCase(),
+    // Note the `s(...)` wrappers. The REST API needs explicitly typed values —
+    // a bare JS string is rejected with a 400 "Payload isn't valid".
+    fullName: s(target.displayName ?? 'You'),
+    handle: s('you'),
+    fullNameLower: s(String(target.displayName ?? 'you').toLowerCase()),
     age: i(30),
     onboarded: b(true),
     verificationTier: s('premium'),
@@ -459,7 +558,7 @@ async function main() {
         suggestionType: s('opener'),
         visibility: s('shared'),
         triggeredBy: s('match_created'),
-        requestedBy: null,
+        requestedBy: nul(),
         basedOn: arrStr(['profile', 'shared_interests']),
         createdAt: ts(now - 1800000),
       });
@@ -482,7 +581,7 @@ async function main() {
         visibility: s('private'),
         targetUserId: s(uid),
         triggeredBy: s('one_sided_answer'),
-        requestedBy: null,
+        requestedBy: nul(),
         basedOn: arrStr(['recent_messages']),
         createdAt: ts(now - 600000),
       });

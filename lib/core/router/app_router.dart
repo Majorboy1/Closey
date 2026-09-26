@@ -251,20 +251,20 @@ final routerProvider = Provider<GoRouter>((ref) {
 });
 
 /// Bridges Riverpod state changes into a `Listenable` for go_router.
+///
+/// This must listen to *exactly* what `redirect` reads. An earlier version
+/// listened to `authStateProvider` and `currentUserProvider` directly, which
+/// caused a real bug: those notify one frame *before* `sessionStatusProvider`
+/// recomputes, so `redirect` read the stale `SessionStatus.unknown`, stayed on
+/// the splash, and — since `sessionStatusProvider` was never listened to —
+/// nothing ever re-triggered the router. The app hung on the splash forever.
 class _RouterRefreshNotifier extends ChangeNotifier {
   _RouterRefreshNotifier(Ref ref) {
     // Any of these changing can flip where the user should be.
     _subs.add(
-      ref.listen<AsyncValue<Object?>>(
-        authStateProvider,
-        (_, _) => notifyListeners(),
-      ),
-    );
-    _subs.add(
-      ref.listen<AsyncValue<Object?>>(
-        currentUserProvider,
-        (_, _) => notifyListeners(),
-      ),
+      ref.listen<SessionStatus>(sessionStatusProvider, (_, _) {
+        notifyListeners();
+      }),
     );
     // The watchdog tripping is itself a reason to re-evaluate the redirect.
     _subs.add(

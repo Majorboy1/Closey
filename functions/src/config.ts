@@ -1,13 +1,18 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-initializeApp({
-  // Large message payloads and the coach's context window both benefit from
-  // ignoring undefined rather than throwing.
-  ignoreUndefinedProperties: true,
-});
+initializeApp();
 
 export const db = getFirestore();
+
+// Large message payloads and the coach's context window both benefit from
+// ignoring `undefined` rather than throwing. This is a Firestore-wide setting,
+// not an app option — `initializeApp` rejects the key, and passing it there
+// fails the whole build at the type level.
+//
+// Must be applied before the first read or write, which is why it sits here at
+// module scope rather than inside a handler.
+db.settings({ ignoreUndefinedProperties: true });
 
 /**
  * Collection and field names, in one place.

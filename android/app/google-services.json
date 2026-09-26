@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "694012428731",
+    "project_id": "closey-ai-coach",
+    "storage_bucket": "closey-ai-coach.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:694012428731:android:812933f7197cc4aa8e449e",
+        "android_client_info": {
+          "package_name": "com.closey.closey"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5BYAlUbuMZ87xEKFYi8iD8ZSZ6SakgBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -533,7 +533,11 @@ export const stripeWebhook = onRequest(
           const uid = subscription.metadata?.firebaseUid;
 
           if (uid) {
-            const periodEnd = subscription.items.data[0]?.current_period_end;
+            // Stripe v17 (API 2024-xx) puts the billing period on the
+            // subscription. It moves to the subscription *item* in later API
+            // versions, so if this ever fails to compile after a `stripe`
+            // upgrade, read it from `subscription.items.data[0]` instead.
+            const periodEnd = subscription.current_period_end;
             if (subscription.status === 'active') {
               await activatePremium(
                 uid,

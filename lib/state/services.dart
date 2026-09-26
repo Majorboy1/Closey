@@ -125,7 +125,7 @@ final sessionStatusProvider = Provider<SessionStatus>((ref) {
   if (auth.value == null) return SessionStatus.signedOut;
 
   final profile = ref.watch(currentUserProvider);
-  // Still waiting on the first Firestore snapshot â€” show the splash rather
+  // Still waiting on the first Firestore snapshot — show the splash rather
   // than flashing the onboarding wizard at an existing user.
   if (profile.isLoading) return SessionStatus.unknown;
 

@@ -43,3 +43,34 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Cloud Functions secrets and local env files.
+#
+# `functions/.secret.local` is what the Functions emulator reads to supply
+# secrets (DEEPSEEK_API_KEY, STRIPE_*). Those are live credentials — committing
+# one would publish it, and this repository is public. `firebase-functions`
+# does not add this pattern to .gitignore for you.
+functions/.secret.local
+functions/.env
+functions/.env.*
+!functions/.env.example
+**/.secret.local
+*.local.json
+
+# Firebase service account keys and local emulator output.
+serviceAccountKey.json
+**/service-account*.json
+.firebase/
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+storage-debug.log
+
+# Cloud Functions dependencies and compiled output.
+#
+# `functions/lib/` is what `tsc` emits and what the Functions runtime actually
+# loads, so it looks tempting to commit — but `predeploy` rebuilds it on every
+# deploy, and a stale committed copy is how a build silently ships old code.
+functions/node_modules/
+functions/lib/
