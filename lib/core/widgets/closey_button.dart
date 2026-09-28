@@ -88,6 +88,7 @@ class CloseyButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final (bg, fg, border) = _resolve(c);
+    final gradient = _gradientFor(c);
 
     final child = AnimatedContainer(
       duration: context.motion(Motion.quick),
@@ -97,7 +98,18 @@ class CloseyButton extends StatelessWidget {
         horizontal: size == CloseyButtonSize.sm ? Gap.lg : Gap.xxl,
       ),
       decoration: BoxDecoration(
-        color: bg,
+        // A flat brand fill was doing all the work before. The gradient is the
+        // cheapest way to make the primary action look like the most finished
+        // thing on the screen, and it is limited to the filled variants so
+        // outlined and ghost buttons stay quiet.
+        color: gradient == null ? bg : null,
+        gradient: gradient == null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gradient,
+              ),
         borderRadius: Radii.pill,
         border: Border.all(
           color: border,
@@ -168,6 +180,23 @@ class CloseyButton extends StatelessWidget {
     }
     return button;
   }
+
+  /// Filled variants get a gradient; outlined and ghost ones stay flat.
+  ///
+  /// Both stops are tokens. The second is the brand lerped toward `accent`, so
+  /// the gradient reads as depth inside a single fill rather than as a
+  /// two-colour banner, and it stays correct if the palette changes again.
+  List<Color>? _gradientFor(CloseyColors c) => switch (variant) {
+    CloseyButtonVariant.primary => [
+      c.brand,
+      Color.lerp(c.brand, c.accent, 0.55)!,
+    ],
+    CloseyButtonVariant.success => [
+      c.success,
+      Color.lerp(c.success, c.brand, 0.35)!,
+    ],
+    _ => null,
+  };
 
   (Color bg, Color fg, Color border) _resolve(CloseyColors c) {
     switch (variant) {
