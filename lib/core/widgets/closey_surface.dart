@@ -18,11 +18,11 @@ class CloseyCard extends StatelessWidget {
     this.onTap,
     this.padding = Gap.cardInsets,
     this.radius = Radii.lg,
-    this.elevated = false,
+    this.elevated = true,
     this.tinted,
     this.borderColor,
     this.borderWidth = Strokes.hairline,
-    this.showBorder = true,
+    this.showBorder = false,
     this.clip = false,
   });
 

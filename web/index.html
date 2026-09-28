@@ -18,7 +18,24 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Closey - a dating app with a shared AI conversation coach.">
+
+  <style>
+    /*
+      The Firebase JS SDK injects a fixed "Running in emulator mode" banner once
+      the Auth emulator is in use. It is anchored over the bottom of the
+      viewport, which is exactly where Closey's navigation bar sits, and it
+      swallows taps aimed at the nav - so in emulator mode the tab bar is partly
+      unclickable even for a real person testing the app.
+
+      `pointer-events: none` keeps the warning readable while letting every tap
+      through to the app underneath. Hiding the banner outright would throw away
+      a genuinely useful signal that you are pointed at an emulator.
+    */
+    .firebase-emulator-warning {
+      pointer-events: none;
+    }
+  </style>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,7 +46,7 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>closey</title>
+  <title>Closey</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>

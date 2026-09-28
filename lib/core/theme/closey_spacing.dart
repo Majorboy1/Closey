@@ -38,18 +38,17 @@ abstract final class Gap {
 
 /// Corner radii.
 ///
-/// Deliberately tighter than dating-app convention. The category standard is
-/// 20–32dp "bubbly" corners with soft shadows, which reads playful and a little
-/// toy-like — and it is everywhere, so it signals nothing. Closey's identity is
-/// paper: printed pages have crisp corners and hairline rules, not pillows.
-/// Cards 16, sheets 28, pills fully round.
+/// Generous and round. A tight, near-square radius was the right call for the
+/// print-like direction and the wrong one for this product: rounded shapes read
+/// as friendly, and a dating app is asking people to be vulnerable. Cards 22,
+/// sheets 32, pills fully round.
 abstract final class Radii {
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 24;
-  static const double sheet = 28;
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 22;
+  static const double xl = 30;
+  static const double sheet = 32;
   static const double full = 999;
 
   static const BorderRadius allSm = BorderRadius.all(Radius.circular(sm));

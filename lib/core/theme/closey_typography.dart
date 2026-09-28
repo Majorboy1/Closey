@@ -20,7 +20,10 @@ import 'closey_palette.dart';
 /// `assets/fonts/`) so text renders on first frame offline.
 abstract final class CloseyTypography {
   static TextTheme textTheme(CloseyColors c) {
-    final display = GoogleFonts.frauncesTextTheme();
+    // One family. The serif display face was the single biggest reason the app
+    // read as a magazine rather than as a dating app, and it was doing no work
+    // the sans could not do at a heavier weight.
+    final display = GoogleFonts.plusJakartaSansTextTheme();
     final body = GoogleFonts.plusJakartaSansTextTheme();
 
     TextStyle d(
@@ -76,7 +79,7 @@ abstract final class CloseyTypography {
 
   /// Extra styles that do not map onto Material's slots.
   static const TextStyle wordmark = TextStyle(
-    fontFamily: 'Fraunces',
+    fontFamily: 'Plus Jakarta Sans',
     fontSize: 24,
     fontWeight: FontWeight.w800,
     letterSpacing: -0.8,
@@ -102,9 +105,9 @@ abstract final class CloseyTypography {
   );
 
   static TextStyle coachCopy(CloseyColors c) => TextStyle(
-    fontFamily: 'Fraunces',
+    fontFamily: 'Plus Jakarta Sans',
     fontSize: 17.5,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w600,
     height: 1.42,
     letterSpacing: -0.1,
     color: c.textPrimary,
@@ -120,17 +123,15 @@ abstract final class CloseyTypography {
 
   /// The coach's marginal voice.
   ///
-  /// Smaller and lighter than [coachCopy], and italic, because a margin note is
-  /// annotation rather than content: it has to be legible as a hand in the
-  /// margin and never as another message in the thread. Setting it in the same
-  /// face as the conversation at the same size is what made the old floating
-  /// card read as a third participant.
+  /// Smaller and lighter than [coachCopy] so it reads as annotation rather than
+  /// as another message in the thread. It used to be an italic serif, which
+  /// made the point by borrowing a print convention; weight and colour carry it
+  /// now that the serif is gone.
   static TextStyle marginNote(CloseyColors c) => TextStyle(
-    fontFamily: 'Fraunces',
-    fontSize: 15,
-    fontWeight: FontWeight.w500,
-    fontStyle: FontStyle.italic,
-    height: 1.48,
+    fontFamily: 'Plus Jakarta Sans',
+    fontSize: 14.5,
+    fontWeight: FontWeight.w600,
+    height: 1.45,
     letterSpacing: -0.05,
     color: c.accentText,
   );
@@ -141,11 +142,11 @@ abstract final class CloseyTypography {
   /// set as a pull quote rather than as another line of body copy — the one
   /// detail on a profile that tells you what they are actually like to talk to.
   static TextStyle pullQuote(CloseyColors c) => TextStyle(
-    fontFamily: 'Fraunces',
-    fontSize: 22,
-    fontWeight: FontWeight.w600,
+    fontFamily: 'Plus Jakarta Sans',
+    fontSize: 21,
+    fontWeight: FontWeight.w800,
     height: 1.28,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
     color: c.textPrimary,
   );
 }
