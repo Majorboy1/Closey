@@ -13,6 +13,7 @@ import '../../core/widgets/closey_button.dart';
 import '../../core/widgets/closey_chip.dart';
 import '../../core/widgets/closey_scaffold.dart';
 import '../../core/widgets/photo_carousel.dart';
+import '../../core/widgets/pressable.dart';
 import '../../data/models/discovery.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../state/app_providers.dart';
@@ -100,20 +101,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                     key: ValueKey(card.user.id),
                     candidate: card,
                     next: deck.next,
-                    onLike: () => _swipe(() {
-                      HapticFeedback.mediumImpact();
-                      return ref.read(deckProvider.notifier).like();
-                    }),
-                    onPass: () => _swipe(() {
-                      HapticFeedback.lightImpact();
-                      return ref.read(deckProvider.notifier).pass();
-                    }),
-                    onSuperLike: () => _swipe(() {
-                      HapticFeedback.heavyImpact();
-                      return ref
-                          .read(deckProvider.notifier)
-                          .like(superLike: true);
-                    }),
+                    onLike: _like,
+                    onPass: _pass,
+                    onSuperLike: _superLike,
                     onOpenProfile: () =>
                         context.push(Routes.publicProfile(card.user.id)),
                   ),
@@ -122,6 +112,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               _DeckActions(
                 canUndo: deck.index > 0,
                 onUndo: () => ref.read(deckProvider.notifier).undo(),
+                onPass: _pass,
+                onLike: _like,
+                onSuperLike: _superLike,
               ),
               const SizedBox(height: Gap.lg),
             ],
@@ -146,6 +139,28 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           .show('That did not save. Check your connection and try again.');
     }
   }
+
+  // One handler per action, shared by the drag gesture and the buttons.
+  //
+  // The buttons previously called a `_noop()` stub while only the gesture was
+  // wired, so tapping Pass, Like or Super like did nothing whatsoever. Sharing
+  // the handlers makes that drift impossible, and the haptic strength lives
+  // here because it is a property of the action, not of how it was triggered.
+
+  void _like() => _swipe(() {
+    HapticFeedback.mediumImpact();
+    return ref.read(deckProvider.notifier).like();
+  });
+
+  void _pass() => _swipe(() {
+    HapticFeedback.lightImpact();
+    return ref.read(deckProvider.notifier).pass();
+  });
+
+  void _superLike() => _swipe(() {
+    HapticFeedback.heavyImpact();
+    return ref.read(deckProvider.notifier).like(superLike: true);
+  });
 
   Future<void> _showMatchCelebration(String? connectionId) async {
     await showDialog<void>(
@@ -423,6 +438,13 @@ class _Stamp extends StatelessWidget {
 }
 
 /// The card content itself.
+/// A person, set as an editorial spread rather than a photograph with a caption.
+///
+/// The category convention is a full-bleed photo with everything overlaid on it,
+/// which lets the picture carry the whole decision and makes the words an
+/// afterthought. Closey's differentiator is what someone is like to *talk* to, so
+/// the prompt answer is given display typography on paper and the photograph
+/// becomes a plate above it.
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({required this.candidate, required this.interactive});
 
@@ -437,22 +459,26 @@ class _ProfileCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: Radii.allXl,
+        borderRadius: Radii.allLg,
         border: Border.all(color: colors.border),
         boxShadow: [
           BoxShadow(
             color: colors.shadow,
-            blurRadius: 28,
-            offset: const Offset(0, 12),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
             spreadRadius: -8,
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // The plate absorbs whatever height the words do not need. This used
+          // to be a fixed 7:5 split against a fixed-height text block, so a
+          // three-line answer overflowed the card on a short viewport instead of
+          // simply shrinking the photograph.
           Expanded(
-            flex: 7,
             child: Stack(
               children: [
                 Positioned.fill(
@@ -468,8 +494,8 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 if (candidate.likedYou)
                   Positioned(
-                    top: Gap.lg,
-                    left: Gap.lg,
+                    top: Gap.md,
+                    left: Gap.md,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: Gap.md,
@@ -504,107 +530,94 @@ class _ProfileCard extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(
-            flex: 5,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Gap.lg,
-                Gap.lg,
-                Gap.lg,
-                Gap.sm,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          user.age != null
-                              ? '${user.fullName}, ${user.age}'
-                              : user.fullName,
-                          style: context.text.displaySmall,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+          Padding(
+            padding: const EdgeInsets.all(Gap.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.age != null
+                            ? '${user.fullName}, ${user.age}'
+                            : user.fullName,
+                        style: context.text.displaySmall,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (user.verificationTier.canUseCoach) ...[
-                        const SizedBox(width: Gap.sm),
-                        Icon(
-                          Icons.verified_rounded,
-                          size: 18,
-                          color: CloseyPalette.amber500,
-                        ),
-                      ],
+                    ),
+                    if (user.verificationTier.canUseCoach) ...[
+                      const SizedBox(width: Gap.sm),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 18,
+                        color: CloseyPalette.amber500,
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 13,
+                  ],
+                ),
+                const SizedBox(height: Gap.xs),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 13,
+                      color: colors.textTertiary,
+                    ),
+                    const SizedBox(width: Gap.xs),
+                    Text(
+                      [
+                        user.city ?? 'Nearby',
+                        if (user.showDistance)
+                          formatDistance(candidate.distanceKm),
+                      ].where((s) => s.isNotEmpty).join(' · '),
+                      style: context.text.bodySmall?.copyWith(
                         color: colors.textTertiary,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        [
-                          user.city ?? 'Nearby',
-                          if (user.showDistance)
-                            formatDistance(candidate.distanceKm),
-                        ].where((s) => s.isNotEmpty).join(' · '),
-                        style: context.text.bodySmall?.copyWith(
-                          color: colors.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  if (user.promptAnswer != null) ...[
-                    const SizedBox(height: Gap.md),
-                    Container(
-                      padding: const EdgeInsets.all(Gap.md),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceSunken,
-                        borderRadius: Radii.allSm,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            (user.promptQuestion ?? '').toUpperCase(),
-                            style: context.eyebrow(),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            user.promptAnswer!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.text.bodyMedium,
-                          ),
-                        ],
                       ),
                     ),
                   ],
+                ),
 
-                  const Spacer(),
-                  if (candidate.sharedInterests.isNotEmpty)
-                    Wrap(
-                      spacing: Gap.sm,
-                      runSpacing: Gap.sm,
-                      children: [
-                        CloseyTag(
-                          label: '${candidate.sharedInterestCount} shared',
-                          tone: CloseyTagTone.success,
-                          icon: Icons.auto_awesome_rounded,
-                        ),
-                        ...candidate.sharedInterests
-                            .take(2)
-                            .map((i) => CloseyTag(label: i)),
-                      ],
-                    ),
+                // The answer sits on the page behind a hairline rather than
+                // inside a filled box. The box made it compete with the
+                // photograph; a rule and display type make it the thing you
+                // actually read before deciding.
+                if (user.promptAnswer != null) ...[
+                  const SizedBox(height: Gap.md),
+                  Container(height: Strokes.hairline, color: colors.border),
+                  const SizedBox(height: Gap.md),
+                  Text(
+                    (user.promptQuestion ?? '').toUpperCase(),
+                    style: context.eyebrow(),
+                  ),
+                  const SizedBox(height: Gap.xs),
+                  Text(
+                    user.promptAnswer!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: CloseyTypography.pullQuote(colors),
+                  ),
                 ],
-              ),
+
+                if (candidate.sharedInterests.isNotEmpty) ...[
+                  const SizedBox(height: Gap.md),
+                  Wrap(
+                    spacing: Gap.sm,
+                    runSpacing: Gap.sm,
+                    children: [
+                      CloseyTag(
+                        label: '${candidate.sharedInterestCount} shared',
+                        tone: CloseyTagTone.success,
+                        icon: Icons.auto_awesome_rounded,
+                      ),
+                      ...candidate.sharedInterests
+                          .take(2)
+                          .map((i) => CloseyTag(label: i)),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -615,10 +628,19 @@ class _ProfileCard extends StatelessWidget {
 
 /// Like / pass / super-like / undo.
 class _DeckActions extends StatelessWidget {
-  const _DeckActions({required this.canUndo, required this.onUndo});
+  const _DeckActions({
+    required this.canUndo,
+    required this.onUndo,
+    required this.onPass,
+    required this.onLike,
+    required this.onSuperLike,
+  });
 
   final bool canUndo;
   final VoidCallback onUndo;
+  final VoidCallback onPass;
+  final VoidCallback onLike;
+  final VoidCallback onSuperLike;
 
   @override
   Widget build(BuildContext context) {
@@ -641,23 +663,23 @@ class _DeckActions extends StatelessWidget {
           ),
           _ActionButton(
             icon: Icons.close_rounded,
-            size: 66,
-            iconSize: 30,
+            size: 62,
+            iconSize: 28,
             background: colors.surface,
             foreground: colors.danger,
-            border: colors.border,
+            border: colors.borderStrong,
             semanticLabel: 'Pass',
-            onTap: () => _noop(),
+            onTap: onPass,
           ),
           _ActionButton(
             icon: Icons.favorite_rounded,
-            size: 66,
-            iconSize: 30,
+            size: 62,
+            iconSize: 28,
             background: colors.brand,
             foreground: colors.textOnBrand,
             border: colors.brand,
             semanticLabel: 'Like',
-            onTap: () => _noop(),
+            onTap: onLike,
           ),
           _ActionButton(
             icon: Icons.star_rounded,
@@ -667,14 +689,12 @@ class _DeckActions extends StatelessWidget {
             foreground: colors.accent,
             border: colors.border,
             semanticLabel: 'Super like',
-            onTap: () => _noop(),
+            onTap: onSuperLike,
           ),
         ],
       ),
     );
   }
-
-  void _noop() {}
 }
 
 class _ActionButton extends StatelessWidget {
@@ -700,13 +720,20 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: GestureDetector(
-        onTap: onTap,
+    // Pressable rather than a bare GestureDetector: these had no pressed state
+    // at all, so a tap that did not immediately advance the deck looked
+    // rejected. Its haptic is suppressed because the action handlers already
+    // pick a strength per action (light to pass, heavy for a super like).
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: semanticLabel,
+      borderRadius: BorderRadius.circular(size / 2),
+      haptic: () {},
+      child: Opacity(
+        // A disabled control has to look disabled. Undo previously kept full
+        // contrast with only a muted icon, which reads as uninteresting rather
+        // than unavailable.
+        opacity: onTap == null ? 0.45 : 1,
         child: Container(
           width: size,
           height: size,
@@ -715,14 +742,6 @@ class _ActionButton extends StatelessWidget {
             color: background,
             shape: BoxShape.circle,
             border: Border.all(color: border, width: Strokes.thin),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow,
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-                spreadRadius: -4,
-              ),
-            ],
           ),
           child: Icon(icon, size: iconSize, color: foreground),
         ),

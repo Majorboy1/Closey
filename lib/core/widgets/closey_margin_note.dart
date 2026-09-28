@@ -50,8 +50,7 @@ class CloseyMarginNote extends StatelessWidget {
   /// The label above the note. Phrased as an offer rather than an instruction —
   /// "you could send" rather than "send this" — because the product's stance is
   /// that the AI suggests and the person chooses.
-  String get _label =>
-      _isPrivate ? 'Only you see this' : 'You could send this';
+  String get _label => _isPrivate ? 'Only you see this' : 'You could send this';
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +66,10 @@ class CloseyMarginNote extends StatelessWidget {
       curve: Motion.standard,
       builder: (context, t, child) => Opacity(
         opacity: t,
-        child: Transform.translate(offset: Offset((1 - t) * 18, 0), child: child),
+        child: Transform.translate(
+          offset: Offset((1 - t) * 18, 0),
+          child: child,
+        ),
       ),
       child: Padding(
         // Indented well past the "mine" bubbles, so it never lines up with the
@@ -127,9 +129,7 @@ class CloseyMarginNote extends StatelessWidget {
                     children: [
                       _NoteAction(
                         label: 'Use this',
-                        onTap: onUse == null
-                            ? null
-                            : () => onUse!(suggestion),
+                        onTap: onUse == null ? null : () => onUse!(suggestion),
                         emphasis: ink,
                       ),
                       const SizedBox(width: Gap.lg),
@@ -160,7 +160,9 @@ class _Rule extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: Strokes.thick,
-    child: CustomPaint(painter: _RulePainter(color: color, dashed: dashed)),
+    child: CustomPaint(
+      painter: _RulePainter(color: color, dashed: dashed),
+    ),
   );
 }
 
