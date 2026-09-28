@@ -108,6 +108,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             body: text,
             sentFromSuggestion: fromSuggestion,
           );
+
+      // The server no-ops unless the other member is simulated, so there is
+      // nothing to branch on here. Not awaited: the reply arrives through the
+      // normal message listener, which is what gives it the same latency and
+      // ordering as a real one.
+      ref
+          .read(chatRepositoryProvider)
+          .simulatePartnerReply(widget.connectionId)
+          .ignore();
+
       _scrollToBottom();
     } on CloseyFailure catch (e) {
       if (mounted) {

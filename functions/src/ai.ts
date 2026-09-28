@@ -178,14 +178,40 @@ export async function generateSuggestion(args: {
     response_format: { type: 'json_object' as const },
   };
 
+  // Two guards, and both were missing. `deepseekKey.value()` returns an empty
+  // string rather than throwing when the emulator cannot reach Secret Manager,
+  // and `fetch` has no default timeout. Together that meant a real request to
+  // DeepSeek carrying a blank bearer token, followed by an indefinite wait for a
+  // reply that never arrived.
+  //
+  // The symptom was the worst possible one: the client sat on "Reading the
+  // conversation..." forever, because a promise that never settles never
+  // rejects either - so `fallback()` below was unreachable, and a missing
+  // developer key looked like a broken feature rather than a missing key.
+  let apiKey = '';
+  try {
+    apiKey = deepseekKey.value() ?? '';
+  } catch {
+    apiKey = '';
+  }
+
+  if (!apiKey.trim()) {
+    logger.warn('DEEPSEEK_API_KEY is not set; composing locally instead.');
+    return fallback(context, type, trigger, targetUserId);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 9000);
+
   try {
     const response = await fetch(DEEPSEEK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${deepseekKey.value()}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -217,7 +243,132 @@ export async function generateSuggestion(args: {
   } catch (error) {
     logger.error('Coach generation failed', error);
     return fallback(context, type, trigger, targetUserId);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/**
+ * A reply written **as the other person**, for the simulated partner.
+ *
+ * This deliberately violates the coach's first rule - the coach must never
+ * speak as anyone - so it keeps its own prompt and its own function, and the
+ * callable that exposes it refuses to run unless the other member is flagged
+ * `isSimulated`. A real account can never be impersonated, which is the only
+ * reason this is safe to have in the codebase at all.
+ *
+ * It exists so the conversation mechanic can be exercised end to end without a
+ * second person, including the coach's own cards, which need a real thread to
+ * read.
+ */
+export async function generatePartnerReply(context: CoachContext): Promise<string> {
+  const transcript =
+    context.transcript.length === 0
+      ? '(no messages yet)'
+      : context.transcript
+          .map((t) => `${t.who === 'me' ? context.myName : context.theirName}: ${t.text}`)
+          .join('\n');
+
+  const prompt = `You are ${context.theirName}, a person on a dating app, chatting with ${context.myName}.
+
+Your profile:
+  bio: ${context.theirBio ?? '(none)'}
+  interests: ${context.theirInterests.join(', ') || '(none)'}
+  loves talking about: ${context.theirTopics.join(', ') || '(none)'}
+  prompt answer: ${context.theirPrompt ?? '(none)'}
+
+Their profile:
+  bio: ${context.myBio ?? '(none)'}
+  interests: ${context.myInterests.join(', ') || '(none)'}
+  loves talking about: ${context.myTopics.join(', ') || '(none)'}
+
+Conversation so far:
+${transcript}
+
+Write your next message as ${context.theirName}, replying to their last message.
+
+RULES:
+1. Sound like a real person texting, not an assistant. No customer-service tone.
+2. One to three sentences. Do not write an essay.
+3. Refer to something specific that was actually said, or to a shared interest.
+4. Ask something back sometimes, but not every single time - that reads as an interview.
+5. Never mention being an AI, a model, a simulation or a test.
+6. No emoji spam. At most one.
+
+Return STRICT JSON only, no markdown fences: {"message": "..."}`;
+
+  let apiKey = '';
+  try {
+    apiKey = deepseekKey.value() ?? '';
+  } catch {
+    apiKey = '';
+  }
+
+  if (!apiKey.trim()) return fallbackReply(context);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const response = await fetch(DEEPSEEK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL_CHEAP,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.95,
+        max_tokens: 160,
+        response_format: { type: 'json_object' as const },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      logger.warn('Partner reply failed', { status: response.status });
+      return fallbackReply(context);
+    }
+
+    const json = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const raw = json.choices?.[0]?.message?.content?.trim();
+    if (!raw) return fallbackReply(context);
+
+    const parsed = JSON.parse(raw) as { message?: string };
+    return (parsed.message ?? '').trim() || fallbackReply(context);
+  } catch (error) {
+    logger.error('Partner reply failed', error);
+    return fallbackReply(context);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Local reply, used when no key is configured.
+ *
+ * Deliberately bland rather than pretending to be clever: a canned reply that
+ * reads as obviously scripted is a far better signal that the model is not
+ * wired up than a plausible one that hides it.
+ */
+function fallbackReply(context: CoachContext): string {
+  const shared = context.myInterests.filter((i) =>
+    context.theirInterests.includes(i),
+  );
+  const hook = shared[0] ?? context.theirInterests[0] ?? 'that';
+
+  const myLast = [...context.transcript].reverse().find((t) => t.who === 'me');
+  if (!myLast) {
+    return `Hey. Your profile made me smile - ${hook}, right? What got you into it?`;
+  }
+
+  return (
+    `That is a good point about ${hook}. ` +
+    'I have not thought about it that way before - what made you land on it?'
+  );
 }
 
 /**

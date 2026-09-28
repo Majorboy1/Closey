@@ -447,6 +447,12 @@ async function main() {
     await setDoc(`users/${person.id}`, {
       fullName: s(person.fullName),
       handle: s(person.id.replace('demo-', '')),
+      // Chiara is the simulated partner: anything sent in her thread gets an AI
+      // reply written as her, which is how the conversation mechanic is
+      // exercised without a second person. This flag is exactly what the
+      // simulatePartnerReply callable checks, so a real account can never be
+      // impersonated - the server simply returns without writing.
+      isSimulated: b(person.id === 'demo-chiara'),
       fullNameLower: s(person.fullName.toLowerCase()),
       age: i(person.age),
       onboarded: b(true),

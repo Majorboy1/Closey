@@ -121,6 +121,23 @@ class ChatRepository {
     await batch.commit();
   }
 
+  /// Asks the backend for a reply from a simulated partner.
+  ///
+  /// Fire-and-forget by design. The server returns quietly when the other member
+  /// is a real person, so the client never has to work out which kind of thread
+  /// it is in - and a failure here must never make sending look broken, which is
+  /// why the error is swallowed rather than surfaced.
+  Future<void> simulatePartnerReply(String connectionId) async {
+    try {
+      await _functions
+          .httpsCallable('simulatePartnerReply')
+          .call<void>({'connectionId': connectionId});
+    } catch (_) {
+      // Intentionally ignored: this is a testing affordance, not a feature the
+      // user asked for.
+    }
+  }
+
   Future<void> deleteMessage({
     required String connectionId,
     required String messageId,

@@ -17,6 +17,7 @@ import {
 import {
   deepseekKey,
   generateSuggestion,
+  generatePartnerReply,
   analyzeConversation,
   loadCoachContext,
   type SuggestionType,
@@ -126,6 +127,79 @@ export const requestSuggestion = onCall(
       suggestion: payload,
       remaining: Math.max(0, after.dailyLimit - after.usedToday),
     };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Simulated partner (development and testing only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Writes a reply into the thread **as the other person**.
+ *
+ * The product's first rule is that the coach never speaks as anyone, so this is
+ * the single place that breaks it - and it is guarded accordingly. The other
+ * member must carry `isSimulated: true`, which only the seed script sets.
+ *
+ * When it is not set this returns quietly instead of raising, so the client can
+ * call it after every message without first working out whether the partner is
+ * simulated. A real account can never be impersonated.
+ */
+export const simulatePartnerReply = onCall(
+  { region: REGION, secrets: [deepseekKey], cors: ALLOWED_ORIGINS },
+  async (request) => {
+    const uid = requireAuth(request.auth);
+    const connectionId = String(request.data?.connectionId ?? '');
+    if (!connectionId) {
+      throw new HttpsError('invalid-argument', 'connectionId is required.');
+    }
+
+    const connection = await db
+      .collection(Col.connections)
+      .doc(connectionId)
+      .get();
+
+    const members: string[] = connection.data()?.members ?? [];
+    if (!members.includes(uid)) {
+      throw new HttpsError(
+        'permission-denied',
+        'You are not a member of this conversation.',
+      );
+    }
+
+    const otherId = members.find((m) => m !== uid);
+    if (!otherId) return { skipped: 'no-other-member' };
+
+    const other = await db.collection(Col.users).doc(otherId).get();
+    if (other.data()?.isSimulated !== true) return { skipped: 'not-simulated' };
+
+    const context = await loadCoachContext(connectionId, uid, otherId);
+    const body = await generatePartnerReply(context);
+
+    const now = new Date();
+    const messageRef = connection.ref.collection(Col.messages).doc();
+
+    await messageRef.set({
+      senderId: otherId,
+      body,
+      readBy: [otherId],
+      // Marked so seeded and generated traffic is distinguishable in the data,
+      // and so nobody later mistakes it for something a person typed.
+      simulated: true,
+      createdAt: now,
+    });
+
+    await connection.ref.set(
+      {
+        lastMessage: body.length > 140 ? `${body.slice(0, 140)}…` : body,
+        lastMessageAt: now,
+        lastMessageSenderId: otherId,
+      },
+      { merge: true },
+    );
+
+    logger.info('Simulated partner replied', { connectionId, chars: body.length });
+    return { messageId: messageRef.id, body };
   },
 );
 
